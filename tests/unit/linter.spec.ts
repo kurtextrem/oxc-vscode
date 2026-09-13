@@ -236,29 +236,4 @@ suite("linter code action routing", () => {
       true,
     );
   });
-
-  test("allows dangerous fixes under broad source when normal fix-all is opted out", () => {
-    const codeActionsOnSave: CodeActionsOnSave = {
-      [CodeActionKind.Source.value]: "always",
-      [oxlintFixAllCodeActionKind.value]: "never",
-    };
-    const broadSourceContext = codeActionContext(
-      CodeActionKind.Source,
-      CodeActionTriggerKind.Automatic,
-    );
-
-    strictEqual(shouldRequestOxlintCodeActions(broadSourceContext, codeActionsOnSave, true), true);
-    strictEqual(
-      shouldRequestOxlintCodeActions(broadSourceContext, codeActionsOnSave, false),
-      false,
-    );
-    strictEqual(
-      shouldRequestOxlintCodeActions(
-        codeActionContext(CodeActionKind.SourceFixAll, CodeActionTriggerKind.Automatic),
-        codeActionsOnSave,
-        true,
-      ),
-      false,
-    );
-  });
 });

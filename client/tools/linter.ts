@@ -29,7 +29,6 @@ import { OxcCommands } from "../commands";
 import { ConfigService } from "../ConfigService";
 import StatusBarItemHandler from "../StatusBarItemHandler";
 import { VSCodeConfig } from "../VSCodeConfig";
-import { FixKind } from "../WorkspaceConfig";
 import { onClientNotification, runExecutable } from "./lsp_helper";
 import ToolInterface from "./ToolInterface";
 import type { BinarySearchResult } from "../findBinary";
@@ -42,18 +41,11 @@ const enum LspCommands {
 
 const oxlintConfigDefaultFilePattern = `**/{.oxlintrc.json,.oxlintrc.jsonc,oxlint.config.ts,oxlint.config.mts}`;
 
-const oxlintFixAllCodeActionKind = CodeActionKind.SourceFixAll.append("oxc");
-const oxlintFixAllDangerousCodeActionKind = CodeActionKind.Source.append("fixAllDangerous.oxc");
 const oxlintSourceCodeActionKinds = [
-  oxlintFixAllCodeActionKind,
-  oxlintFixAllDangerousCodeActionKind,
+  CodeActionKind.SourceFixAll.append("oxc"),
+  CodeActionKind.Source.append("fixAllDangerous.oxc"),
 ];
 const oxlintCodeActionKinds = [CodeActionKind.QuickFix, ...oxlintSourceCodeActionKinds];
-const dangerousOxlintFixKinds = new Set([
-  FixKind.DangerousFix,
-  FixKind.DangerousFixOrSuggestion,
-  FixKind.All,
-]);
 
 type CodeActionsOnSaveSetting = boolean | "always" | "explicit" | "never";
 type CodeActionsOnSave = Record<string, CodeActionsOnSaveSetting | undefined>;
@@ -107,7 +99,6 @@ function getCodeActionsOnSaveConfiguration(
 export function shouldRequestOxlintCodeActions(
   context: CodeActionContext,
   codeActionsOnSave?: CodeActionsOnSaveConfiguration,
-  dangerousFixesEnabled: boolean = false,
 ): boolean {
   const requestedKind = context.only;
   if (requestedKind === undefined) {
@@ -138,7 +129,6 @@ export function shouldRequestOxlintCodeActions(
       return requestedSourceKinds.some(
         (kind) =>
           codeActionsOnSave !== undefined &&
-          (kind.value !== oxlintFixAllDangerousCodeActionKind.value || dangerousFixesEnabled) &&
           shouldCodeActionsOnSaveRequestOxlint(codeActionsOnSave, kind),
       );
     }
@@ -299,25 +289,12 @@ export default class LinterTool implements ToolInterface {
             context.only !== undefined &&
             oxlintSourceCodeActionKinds.some((kind) => context.only?.contains(kind));
 
-          const requestsDangerousFixes =
-            needsCodeActionsOnSaveConfig &&
-            context.only?.contains(oxlintFixAllDangerousCodeActionKind) === true;
-          const workspaceFolder = requestsDangerousFixes
-            ? workspace.getWorkspaceFolder(document.uri)
-            : undefined;
-          const fixKind = workspaceFolder
-            ? this.configService.getWorkspaceConfig(workspaceFolder.uri)?.fixKind
-            : undefined;
-
           if (
             !shouldRequestOxlintCodeActions(
               context,
               needsCodeActionsOnSaveConfig
                 ? getCodeActionsOnSaveConfiguration(document)
                 : undefined,
-              // Do not keep a broad source request solely for an action the
-              // configured oxlint server cannot return.
-              fixKind !== null && fixKind !== undefined && dangerousOxlintFixKinds.has(fixKind),
             )
           ) {
             return [];
